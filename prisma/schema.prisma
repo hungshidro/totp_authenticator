@@ -4,11 +4,11 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-// Note: Prisma 7 CLI tools still require url property
-// Runtime uses prisma.config.ts and adapter pattern
+// Note: Prisma 7 does NOT allow url in schema
+// - Migration: Use npm run migrate (custom script)
+// - Runtime: Uses prisma.config.ts and adapter pattern
 
 model TOTPSecret {
   id        String   @id @default(cuid())
