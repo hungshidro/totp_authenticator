@@ -142,31 +142,63 @@ export default function Home() {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { 
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
       });
       
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        // Không cần gọi play() vì đã có autoPlay
       }
       
       setIsScanning(true);
       setError("");
       
-      // Bắt đầu quét
-      scanQRCode();
+      // Đợi một chút để video sẵn sàng
+      setTimeout(() => {
+        scanQRCode();
+      }, 500);
     } catch (err: any) {
+      console.error("Camera error details:", err);
       if (err.name === "NotAllowedError") {
         setError("Bạn đã từ chối quyền truy cập camera. Vui lòng cấp quyền trong cài đặt trình duyệt.");
       } else if (err.name === "NotFoundError") {
         setError("Không tìm thấy camera trên thiết bị.");
       } else if (err.name === "NotReadableError") {
         setError("Camera đang được sử dụng bởi ứng dụng khác.");
+      } else if (err.name === "OverconstrainedError") {
+        // Thử lại với constraints đơn giản hơn
+        retryWithBasicConstraints();
       } else {
         setError(err.message || "Không thể truy cập camera. Vui lòng sử dụng chức năng Upload ảnh.");
       }
-      console.error("Camera error:", err);
+    }
+  };
+
+  const retryWithBasicConstraints = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true
+      });
+      
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      
+      setIsScanning(true);
+      setError("");
+      
+      setTimeout(() => {
+        scanQRCode();
+      }, 500);
+    } catch (err: any) {
+      console.error("Retry camera error:", err);
+      setError("Không thể truy cập camera. Vui lòng sử dụng chức năng Upload ảnh.");
     }
   };
 
@@ -189,19 +221,21 @@ export default function Home() {
     
     const video = videoRef.current;
     
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    // Đảm bảo video đã có dữ liệu
+    if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext("2d");
       
-      if (ctx && canvas.width > 0 && canvas.height > 0) {
+      if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height);
         
         if (code && code.data.startsWith("otpauth://totp/")) {
           // Tìm thấy QR code hợp lệ
+          console.log("QR detected:", code.data);
           setUri(code.data);
           stopScanning();
           return;
@@ -371,6 +405,7 @@ export default function Home() {
                   <video
                     ref={videoRef}
                     className="w-full rounded-lg"
+                    autoPlay
                     playsInline
                     muted
                   />
