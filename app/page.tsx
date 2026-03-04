@@ -20,6 +20,7 @@ export default function Home() {
   const [savedCount, setSavedCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -46,6 +47,7 @@ export default function Home() {
 
   const startScanning = async () => {
     setIsScanning(true);
+    setScanSuccess(false);
     setError("");
 
     // Đợi DOM render
@@ -57,6 +59,7 @@ export default function Home() {
           console.log("QR scanned:", decodedText);
           if (decodedText.startsWith("otpauth://totp/")) {
             setUri(decodedText);
+            setScanSuccess(true);
             stopScanning();
           } else {
             setError("Mã QR không đúng định dạng TOTP.");
@@ -71,6 +74,7 @@ export default function Home() {
           config,
           qrCodeSuccessCallback,
           (errorMessage) => {
+            setError("Không thể quét mã QR. Vui lòng thử lại.");
             // Lỗi quét liên tục, có thể bỏ qua
           }
         );
@@ -361,6 +365,29 @@ export default function Home() {
                     className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                   >
                     Đóng máy quét
+                  </button>
+                </div>
+              ) : scanSuccess && uri ? (
+                <div className="space-y-3 mt-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-green-700 font-medium flex items-center gap-2">
+                      <span className="text-2xl">✓</span>
+                      <span>Quét thành công!</span>
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">URI đã quét:</p>
+                    <p className="text-xs text-gray-700 break-all font-mono">{uri}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScanSuccess(false);
+                      setUri("");
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Quét lại
                   </button>
                 </div>
               ) : qrPreview ? (
