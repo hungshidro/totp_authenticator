@@ -17,17 +17,33 @@ export default function Home() {
   const [error, setError] = useState("");
   const [qrPreview, setQrPreview] = useState<string>("");
   const [savedCount, setSavedCount] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanIntervalRef = useRef<number | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     // Đếm số lượng tokens đã lưu
     setSavedCount(storage.getAll().length);
+    
+    // Cleanup camera khi unmount
+    return () => {
+      stopScanning();
+    };
   }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      await handleFileFromInput(file);
+    }
+  };
+
+  const handleFileFromInput = async (file: File) => {
 
     setError("");
     setLoading(true);
@@ -113,6 +129,125 @@ export default function Home() {
     } catch (err: any) {
       setError(err.message);
       setLoading(false);
+    }
+  };
+
+  const startScanning = async () => {
+    try {
+      // Kiểm tra hỗ trợ camera
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(
+          "Trình duyệt không hỗ trợ camera hoặc trang web cần chạy qua HTTPS. Vui lòng sử dụng chức năng Upload ảnh thay thế."
+        );
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+      
+      setIsScanning(true);
+      setError("");
+      
+      // Bắt đầu quét
+      scanQRCode();
+    } catch (err: any) {
+      if (err.name === "NotAllowedError") {
+        setError("Bạn đã từ chối quyền truy cập camera. Vui lòng cấp quyền trong cài đặt trình duyệt.");
+      } else if (err.name === "NotFoundError") {
+        setError("Không tìm thấy camera trên thiết bị.");
+      } else if (err.name === "NotReadableError") {
+        setError("Camera đang được sử dụng bởi ứng dụng khác.");
+      } else {
+        setError(err.message || "Không thể truy cập camera. Vui lòng sử dụng chức năng Upload ảnh.");
+      }
+      console.error("Camera error:", err);
+    }
+  };
+
+  const stopScanning = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    
+    if (scanIntervalRef.current) {
+      cancelAnimationFrame(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    
+    setIsScanning(false);
+  };
+
+  const scanQRCode = () => {
+    if (!videoRef.current || !isScanning) return;
+    
+    const video = videoRef.current;
+    
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      
+      if (ctx && canvas.width > 0 && canvas.height > 0) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        
+        if (code && code.data.startsWith("otpauth://totp/")) {
+          // Tìm thấy QR code hợp lệ
+          setUri(code.data);
+          stopScanning();
+          return;
+        }
+      }
+    }
+    
+    // Tiếp tục quét
+    scanIntervalRef.current = requestAnimationFrame(scanQRCode);
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        setError("Vui lòng chọn file ảnh (PNG, JPG, etc.)");
+        return;
+      }
+
+      // Create a synthetic event to reuse handleFileChange logic
+      // Directly process the file without creating synthetic event
+      handleFileFromInput(file);
     }
   };
 
@@ -220,7 +355,7 @@ export default function Home() {
           {mode === "qr-image" ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload ảnh QR Code
+                Quét hoặc Upload ảnh QR Code
               </label>
 
               <input
@@ -231,52 +366,107 @@ export default function Home() {
                 className="hidden"
               />
 
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors"
-              >
-                {qrPreview ? (
-                  <div className="space-y-3">
-                    <img
-                      src={qrPreview}
-                      alt="QR Preview"
-                      className="max-w-full max-h-64 mx-auto rounded"
-                    />
-                    <p className="text-sm text-green-600 font-medium">
-                      ✓ QR Code đã được phát hiện
-                    </p>
-                    {uri && (
-                      <div className="bg-gray-50 p-2 rounded text-xs text-gray-600 break-all">
-                        {uri}
-                      </div>
-                    )}
+              {isScanning ? (
+                <div className="relative">
+                  <video
+                    ref={videoRef}
+                    className="w-full rounded-lg"
+                    playsInline
+                    muted
+                  />
+                  <div className="absolute inset-0 border-4 border-blue-500 rounded-lg pointer-events-none">
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                      <div className="w-48 h-48 border-4 border-green-500 rounded-lg"></div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={stopScanning}
+                    className="absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Đóng camera
+                  </button>
+                  <p className="text-center mt-2 text-sm text-gray-600">
+                    Đưa QR code vào khung vuông để quét
+                  </p>
+                </div>
+              ) : qrPreview ? (
+                <div className="space-y-3">
+                  <img
+                    src={qrPreview}
+                    alt="QR Preview"
+                    className="max-w-full max-h-64 mx-auto rounded"
+                  />
+                  <p className="text-sm text-green-600 font-medium">
+                    ✓ QR Code đã được phát hiện
+                  </p>
+                  {uri && (
+                    <div className="bg-gray-50 p-2 rounded text-xs text-gray-600 break-all">
+                      {uri}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQrPreview("");
+                      setUri("");
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    Chọn ảnh khác
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2 mb-4">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setQrPreview("");
-                        setUri("");
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = "";
-                        }
-                      }}
-                      className="text-sm text-blue-600 hover:text-blue-700"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
-                      Chọn ảnh khác
+                      <span>📁</span>
+                      <span>Chọn từ thư viện</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={startScanning}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <span>📸</span>
+                      <span>Quét QR</span>
                     </button>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="text-4xl">📷</div>
-                    <p className="text-gray-600 font-medium">
-                      Click để chọn ảnh QR Code
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Hỗ trợ PNG, JPG, JPEG, GIF
-                    </p>
+
+                  <div
+                    onDragEnter={handleDragEnter}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                      isDragging
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-300 hover:border-blue-500"
+                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="space-y-2">
+                      <div className="text-4xl">📷</div>
+                      <p className="text-gray-600 font-medium">
+                        {isDragging
+                          ? "Thả ảnh vào đây"
+                          : "Kéo thả ảnh QR Code vào đây"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Hoặc sử dụng các nút bên trên
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
+                </>
+              )}
 
               {loading && !error && (
                 <div className="mt-3 flex items-center justify-center gap-2 text-blue-600">
