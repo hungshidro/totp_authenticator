@@ -56,14 +56,14 @@ export default function Home() {
           fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
-          formatsToSupport: [],
         },
-        false
+        /* verbose= */ false,
       );
 
       scanner.render(
         (decodedText) => {
           // Quét thành công
+          console.log("QR scanned:", decodedText);
           if (decodedText.startsWith("otpauth://totp/")) {
             setUri(decodedText);
             stopScanning();
@@ -73,7 +73,8 @@ export default function Home() {
         },
         (errorMessage) => {
           // Lỗi quét (có thể bỏ qua vì quét liên tục)
-        }
+          console.log("Scan error:", errorMessage);
+        },
       );
 
       scannerRef.current = scanner;
@@ -98,7 +99,6 @@ export default function Home() {
   };
 
   const handleFileFromInput = async (file: File) => {
-
     setError("");
     setLoading(true);
 
@@ -186,8 +186,6 @@ export default function Home() {
     }
   };
 
-
-
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -213,7 +211,7 @@ export default function Home() {
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       const file = files[0];
-      
+
       // Validate file type
       if (!file.type.startsWith("image/")) {
         setError("Vui lòng chọn file ảnh (PNG, JPG, etc.)");
@@ -349,10 +347,10 @@ export default function Home() {
                 onChange={handleFileChange}
                 className="hidden"
               />
+              <div id="qr-reader" className="w-full"></div>
 
               {isScanning ? (
                 <div>
-                  <div id="qr-reader" className="w-full"></div>
                   <button
                     type="button"
                     onClick={stopScanning}

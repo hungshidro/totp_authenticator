@@ -17,3 +17,34 @@ body {
     )
     rgb(var(--background-start-rgb));
 }
+
+/* HTML5 QR Code Scanner Styles */
+#qr-reader {
+  width: 100%;
+}
+
+#qr-reader video {
+  width: 100%;
+  border-radius: 0.5rem;
+}
+
+#qr-reader__dashboard_section_csr {
+  display: none !important;
+}
+
+#qr-reader__camera_selection {
+  margin-bottom: 1rem;
+}
+
+#qr-reader__camera_permission_button {
+  background-color: #2563eb;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+}
+
+#qr-reader__camera_permission_button:hover {
+  background-color: #1d4ed8;
+}
