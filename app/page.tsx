@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import jsQR from "jsqr";
+import { Html5QrcodeScanner } from "html5-qrcode";
 import { storage } from "@/lib/storage";
 import { deviceManager } from "@/lib/device";
 
@@ -18,19 +19,81 @@ export default function Home() {
   const [qrPreview, setQrPreview] = useState<string>("");
   const [savedCount, setSavedCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     // Đếm số lượng tokens đã lưu
     setSavedCount(storage.getAll().length);
+
+    // Cleanup scanner khi unmount
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {});
+      }
+    };
   }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       await handleFileFromInput(file);
+    }
+  };
+
+  const startScanning = () => {
+    setIsScanning(true);
+    setError("");
+
+    // Đợi DOM render
+    setTimeout(() => {
+      const scanner = new Html5QrcodeScanner(
+        "qr-reader",
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+          formatsToSupport: [],
+        },
+        false
+      );
+
+      scanner.render(
+        (decodedText) => {
+          // Quét thành công
+          if (decodedText.startsWith("otpauth://totp/")) {
+            setUri(decodedText);
+            stopScanning();
+          } else {
+            setError("Mã QR không đúng định dạng TOTP.");
+          }
+        },
+        (errorMessage) => {
+          // Lỗi quét (có thể bỏ qua vì quét liên tục)
+        }
+      );
+
+      scannerRef.current = scanner;
+    }, 100);
+  };
+
+  const stopScanning = () => {
+    if (scannerRef.current) {
+      scannerRef.current
+        .clear()
+        .then(() => {
+          scannerRef.current = null;
+          setIsScanning(false);
+        })
+        .catch(() => {
+          scannerRef.current = null;
+          setIsScanning(false);
+        });
+    } else {
+      setIsScanning(false);
     }
   };
 
@@ -287,7 +350,18 @@ export default function Home() {
                 className="hidden"
               />
 
-              {qrPreview ? (
+              {isScanning ? (
+                <div>
+                  <div id="qr-reader" className="w-full"></div>
+                  <button
+                    type="button"
+                    onClick={stopScanning}
+                    className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Đóng máy quét
+                  </button>
+                </div>
+              ) : qrPreview ? (
                 <div className="space-y-3">
                   <img
                     src={qrPreview}
@@ -330,11 +404,11 @@ export default function Home() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => cameraInputRef.current?.click()}
+                      onClick={startScanning}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
                       <span>📸</span>
-                      <span>Chụp ảnh QR</span>
+                      <span>Quét QR</span>
                     </button>
                   </div>
 
