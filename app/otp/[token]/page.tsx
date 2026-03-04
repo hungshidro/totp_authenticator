@@ -1,64 +1,81 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { storage } from '@/lib/storage'
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { storage } from "@/lib/storage";
+import { deviceManager } from "@/lib/device";
 
 interface OTPData {
-  code: string
-  timeRemaining: number
-  name: string
-  issuer?: string
+  code: string;
+  timeRemaining: number;
+  name: string;
+  issuer?: string;
+  isOwner?: boolean;
+  isPublic?: boolean;
 }
 
 export default function OTPPage() {
-  const params = useParams()
-  const token = params.token as string
-  const [otpData, setOtpData] = useState<OTPData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
-  const [isSaved, setIsSaved] = useState(false)
+  const params = useParams();
+  const token = params.token as string;
+  const [otpData, setOtpData] = useState<OTPData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   const fetchOTP = async () => {
     try {
-      const response = await fetch(`/api/totp/${token}`)
-      const data = await response.json()
+      const deviceId = await deviceManager.getDeviceId();
+      const response = await fetch(`/api/totp/${token}`, {
+        headers: {
+          'x-device-id': deviceId,
+        },
+      });
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Có lỗi xảy ra')
+        throw new Error(data.error || "Có lỗi xảy ra");
       }
 
-      setOtpData(data)
-      setError('')
+      setOtpData(data);
+      setError("");
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchOTP()
-    
+    fetchOTP();
+
     // Kiểm tra xem token đã được lưu chưa
-    setIsSaved(storage.isSaved(token))
+    setIsSaved(storage.isSaved(token));
 
     // Refresh OTP every second để cập nhật countdown
     const interval = setInterval(() => {
-      fetchOTP()
-    }, 1000)
+      fetchOTP();
+    }, 1000);
 
-    return () => clearInterval(interval)
-  }, [token])
+    return () => clearInterval(interval);
+  }, [token]);
 
   const copyToClipboard = async () => {
     if (otpData?.code) {
-      await navigator.clipboard.writeText(otpData.code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(otpData.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
-  }
+  };
+
+  const copyLink = async () => {
+    if (typeof window !== "undefined") {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
 
   const handleSaveToDevice = () => {
     if (otpData) {
@@ -68,15 +85,44 @@ export default function OTPPage() {
         issuer: otpData.issuer,
         url: window.location.href,
         savedAt: new Date().toISOString(),
-      })
-      setIsSaved(true)
+      });
+      setIsSaved(true);
     }
-  }
+  };
 
   const handleRemoveFromDevice = () => {
-    storage.remove(token)
-    setIsSaved(false)
-  }
+    storage.remove(token);
+    setIsSaved(false);
+  };
+
+  const handleTogglePublic = async () => {
+    if (!otpData?.isOwner) return;
+
+    try {
+      const deviceId = await deviceManager.getDeviceId();
+      const response = await fetch(`/api/totp/${token}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': deviceId,
+        },
+        body: JSON.stringify({
+          isPublic: !otpData.isPublic,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Có lỗi xảy ra");
+      }
+
+      // Refresh để lấy trạng thái mới
+      fetchOTP();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
 
   if (loading) {
     return (
@@ -86,7 +132,7 @@ export default function OTPPage() {
           <p className="mt-4 text-gray-600">Đang tải...</p>
         </div>
       </main>
-    )
+    );
   }
 
   if (error) {
@@ -104,10 +150,10 @@ export default function OTPPage() {
           </a>
         </div>
       </main>
-    )
+    );
   }
 
-  const progress = otpData ? (otpData.timeRemaining / 30) * 100 : 0
+  const progress = otpData ? (otpData.timeRemaining / 30) * 100 : 0;
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4">
@@ -124,7 +170,7 @@ export default function OTPPage() {
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-8 mb-6">
           <div className="text-center mb-4">
             <div className="text-5xl font-mono font-bold text-gray-800 tracking-wider">
-              {otpData?.code.slice(0, 3)}{' '}
+              {otpData?.code.slice(0, 3)}{" "}
               <span className="text-blue-600">{otpData?.code.slice(3)}</span>
             </div>
           </div>
@@ -150,7 +196,7 @@ export default function OTPPage() {
           {isSaved ? (
             <button
               onClick={handleRemoveFromDevice}
-              className="w-full bg-red-50 hover:bg-red-100 text-red-700 font-medium py-3 px-4 rounded-lg transition-colors border border-red-200 flex items-center justify-center gap-2"
+              className="w-full bg-red-50 hover:bg-red-100 text-red-700 font-medium mt-2 py-3 px-4 rounded-lg transition-colors border border-red-200 flex items-center justify-center gap-2"
             >
               <span>🗑️</span>
               <span>Xóa khỏi thiết bị</span>
@@ -158,7 +204,7 @@ export default function OTPPage() {
           ) : (
             <button
               onClick={handleSaveToDevice}
-              className="w-full bg-green-50 hover:bg-green-100 text-green-700 font-medium py-3 px-4 rounded-lg transition-colors border border-green-200 flex items-center justify-center gap-2"
+              className="w-full bg-green-50 hover:bg-green-100 text-green-700 font-medium mt-2 py-3 px-4 rounded-lg transition-colors border border-green-200 flex items-center justify-center gap-2"
             >
               <span>💾</span>
               <span>Lưu vào thiết bị</span>
@@ -177,8 +223,8 @@ export default function OTPPage() {
             <div
               className={`h-full rounded-full transition-all duration-1000 ${
                 (otpData?.timeRemaining || 0) <= 5
-                  ? 'bg-red-500'
-                  : 'bg-blue-600'
+                  ? "bg-red-500"
+                  : "bg-blue-600"
               }`}
               style={{ width: `${progress}%` }}
             ></div>
@@ -186,25 +232,59 @@ export default function OTPPage() {
         </div>
 
         <div className="space-y-3">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <span className="font-semibold">💡 Mẹo:</span> Mã OTP sẽ tự động
-              cập nhật mỗi 30 giây
-            </p>
-          </div>
-
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <p className="text-xs text-gray-600 mb-2">
               <span className="font-semibold">🔗 Link của bạn:</span>
             </p>
-            <div className="bg-white p-2 rounded border border-gray-300">
-              <code className="text-xs text-gray-700 break-all">
-                {typeof window !== 'undefined' ? window.location.href : ''}
+            <div className="bg-white p-2 rounded border border-gray-300 flex items-center gap-2">
+              <code className="text-xs text-gray-700 flex-1 overflow-hidden whitespace-nowrap text-ellipsis">
+                {typeof window !== "undefined" ? window.location.href : ""}
               </code>
+              <button
+                onClick={copyLink}
+                className="text-gray-600 hover:text-blue-600 transition-colors flex-shrink-0"
+                title="Sao chép link"
+              >
+                {copiedLink ? (
+                  <span className="text-green-600">✓</span>
+                ) : (
+                  <span>📄</span>
+                )}
+              </button>
             </div>
             <p className="text-xs text-gray-500 mt-2">
               Lưu link này để xem OTP bất cứ lúc nào
             </p>
+
+            {/* Checkbox public/private - chỉ hiện cho thiết bị chủ */}
+            {otpData?.isOwner && (
+              <div className="mt-3 pt-3 border-t border-gray-300">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={otpData?.isPublic || false}
+                    onChange={handleTogglePublic}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-xs text-gray-700">
+                    Cho phép các thiết bị khác truy cập link này
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">
+                  {otpData?.isPublic
+                    ? "🌐 Link đang ở chế độ public - mọi thiết bị có thể truy cập"
+                    : "🔒 Link chỉ dành cho thiết bị này"}
+                </p>
+              </div>
+            )}
+
+            {!otpData?.isOwner && (
+              <div className="mt-3 pt-3 border-t border-gray-300">
+                <p className="text-xs text-gray-500">
+                  ℹ️ Bạn đang xem từ thiết bị khác. Chỉ thiết bị chủ mới có thể thay đổi cài đặt.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -228,5 +308,5 @@ export default function OTPPage() {
         </div>
       </div>
     </main>
-  )
+  );
 }

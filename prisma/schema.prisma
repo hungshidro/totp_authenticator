@@ -16,6 +16,8 @@ model TOTPSecret {
   name      String
   issuer    String?
   secret    String
+  deviceId  String   // Device ID của thiết bị tạo tài khoản
+  isPublic  Boolean  @default(false) // Cho phép các thiết bị khác truy cập
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

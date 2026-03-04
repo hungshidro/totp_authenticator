@@ -8,6 +8,9 @@ export async function GET(
 ) {
   try {
     const { token } = params
+    
+    // Lấy deviceId từ header (sẽ được gửi từ client)
+    const deviceId = request.headers.get('x-device-id')
 
     // Lấy secret từ database
     const totpRecord = await prisma.tOTPSecret.findUnique({
@@ -16,6 +19,15 @@ export async function GET(
 
     if (!totpRecord) {
       return NextResponse.json({ error: 'Token không tồn tại' }, { status: 404 })
+    }
+
+    // Kiểm tra quyền truy cập
+    const isOwner = deviceId === totpRecord.deviceId
+    if (!totpRecord.isPublic && !isOwner) {
+      return NextResponse.json(
+        { error: 'Không có quyền truy cập. Tài khoản này chỉ dành cho thiết bị chủ.' },
+        { status: 403 }
+      )
     }
 
     // Tạo TOTP instance
@@ -41,9 +53,57 @@ export async function GET(
       timeRemaining,
       name: totpRecord.name,
       issuer: totpRecord.issuer,
+      isOwner, // Để client biết có quyền chỉnh sửa không
+      isPublic: totpRecord.isPublic,
     })
   } catch (error) {
     console.error('Error generating OTP:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { token: string } }
+) {
+  try {
+    const { token } = params
+    const deviceId = request.headers.get('x-device-id')
+    const body = await request.json()
+    const { isPublic } = body
+
+    // Lấy record từ database
+    const totpRecord = await prisma.tOTPSecret.findUnique({
+      where: { token },
+    })
+
+    if (!totpRecord) {
+      return NextResponse.json({ error: 'Token không tồn tại' }, { status: 404 })
+    }
+
+    // Chỉ thiết bị chủ mới được cập nhật
+    if (deviceId !== totpRecord.deviceId) {
+      return NextResponse.json(
+        { error: 'Chỉ thiết bị chủ mới có thể thay đổi cài đặt này' },
+        { status: 403 }
+      )
+    }
+
+    // Cập nhật trạng thái
+    const updated = await prisma.tOTPSecret.update({
+      where: { token },
+      data: { isPublic },
+    })
+
+    return NextResponse.json({
+      success: true,
+      isPublic: updated.isPublic,
+    })
+  } catch (error) {
+    console.error('Error updating TOTP:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

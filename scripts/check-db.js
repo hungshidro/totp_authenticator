@@ -4,11 +4,12 @@
  * Check if DATABASE_URL is configured properly
  */
 
-require('dotenv').config()
+require('dotenv').config();
+const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const pg = require('pg');
 
-const { PrismaClient } = require('@prisma/client')
-const { PrismaPg } = require('@prisma/adapter-pg')
-const { Pool } = require('pg')
+const { Pool } = pg;
 
 const connectionString = process.env.DATABASE_URL
 

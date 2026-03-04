@@ -6,7 +6,14 @@ import { nanoid } from 'nanoid'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { uri, name, issuer } = body
+    const { uri, name, issuer, deviceId } = body
+
+    if (!deviceId) {
+      return NextResponse.json(
+        { error: 'Device ID is required' },
+        { status: 400 }
+      )
+    }
 
     let secret: string
     let accountName: string
@@ -48,6 +55,8 @@ export async function POST(request: NextRequest) {
         name: accountName,
         issuer: issuerName,
         secret,
+        deviceId,
+        isPublic: false, // Mặc định là private
       },
     })
 
