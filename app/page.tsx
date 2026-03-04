@@ -74,7 +74,6 @@ export default function Home() {
           config,
           qrCodeSuccessCallback,
           (errorMessage) => {
-            setError("Không thể quét mã QR. Vui lòng thử lại.");
             // Lỗi quét liên tục, có thể bỏ qua
           }
         );
