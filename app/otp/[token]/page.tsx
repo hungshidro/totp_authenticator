@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { storage } from "@/lib/storage";
 import { deviceManager } from "@/lib/device";
 
@@ -16,6 +16,7 @@ interface OTPData {
 
 export default function OTPPage() {
   const params = useParams();
+  const router = useRouter();
   const token = params.token as string;
   const [otpData, setOtpData] = useState<OTPData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,7 @@ export default function OTPPage() {
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [togglingPublic, setTogglingPublic] = useState(false);
 
   const fetchOTP = async () => {
     try {
@@ -96,9 +98,10 @@ export default function OTPPage() {
   };
 
   const handleTogglePublic = async () => {
-    if (!otpData?.isOwner) return;
+    if (!otpData?.isOwner || togglingPublic) return;
 
     try {
+      setTogglingPublic(true);
       const deviceId = await deviceManager.getDeviceId();
       const response = await fetch(`/api/totp/${token}`, {
         method: 'PATCH',
@@ -114,13 +117,14 @@ export default function OTPPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Có lỗi xảy ra");
+        throw new Error(data.error || "Error occurred");
       }
 
-      // Refresh để lấy trạng thái mới
-      fetchOTP();
+      await fetchOTP();
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setTogglingPublic(false);
     }
   };
 
@@ -256,32 +260,42 @@ export default function OTPPage() {
               Lưu link này để xem OTP bất cứ lúc nào
             </p>
 
-            {/* Checkbox public/private - chỉ hiện cho thiết bị chủ */}
+            {/* Checkbox public/private - only visible for device owner */}
             {otpData?.isOwner && (
               <div className="mt-3 pt-3 border-t border-gray-300">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer" onClick={handleTogglePublic}>
                   <input
                     type="checkbox"
                     checked={otpData?.isPublic || false}
                     onChange={handleTogglePublic}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                    disabled={togglingPublic}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   />
                   <span className="text-xs text-gray-700">
-                    Cho phép các thiết bị khác truy cập link này
+                    {togglingPublic ? "Updating..." : "Allow other devices to access this link"}
                   </span>
                 </label>
                 <p className="text-xs text-gray-500 mt-1 ml-6">
                   {otpData?.isPublic
-                    ? "🌐 Link đang ở chế độ public - mọi thiết bị có thể truy cập"
-                    : "🔒 Link chỉ dành cho thiết bị này"}
+                    ? "🌐 Link is public - all devices can access"
+                    : "🔒 Link is private to this device"}
                 </p>
+
+                {/* Device Management Link */}
+                <button
+                  onClick={() => router.push(`/devices/${token}`)}
+                  className="mt-3 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium py-2 px-4 rounded-lg transition-colors border border-blue-200 flex items-center justify-center gap-2"
+                >
+                  <span>🖥️</span>
+                  <span>Manage Devices</span>
+                </button>
               </div>
             )}
 
             {!otpData?.isOwner && (
               <div className="mt-3 pt-3 border-t border-gray-300">
                 <p className="text-xs text-gray-500">
-                  ℹ️ Bạn đang xem từ thiết bị khác. Chỉ thiết bị chủ mới có thể thay đổi cài đặt.
+                  ℹ️ You are viewing from another device. Only the owner device can change settings.
                 </p>
               </div>
             )}

@@ -16,8 +16,28 @@ model TOTPSecret {
   name      String
   issuer    String?
   secret    String
-  deviceId  String   // Device ID của thiết bị tạo tài khoản
-  isPublic  Boolean  @default(false) // Cho phép các thiết bị khác truy cập
+  deviceId  String   // Device ID of the device that created this account
+  isPublic  Boolean  @default(false) // Allow other devices to access
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  deviceAccess DeviceAccess[]
+}
+
+model DeviceAccess {
+  id           String   @id @default(cuid())
+  token        String
+  deviceId     String
+  ipAddress    String?
+  userAgent    String?
+  isSaved      Boolean  @default(false)
+  isBlocked    Boolean  @default(false)
+  firstAccess  DateTime @default(now())
+  lastAccess   DateTime @updatedAt
+  
+  totpSecret   TOTPSecret @relation(fields: [token], references: [token], onDelete: Cascade)
+  
+  @@unique([token, deviceId])
+  @@index([token])
+  @@index([deviceId])
 }

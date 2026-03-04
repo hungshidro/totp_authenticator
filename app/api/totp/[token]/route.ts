@@ -9,28 +9,74 @@ export async function GET(
   try {
     const { token } = params
     
-    // Lấy deviceId từ header (sẽ được gửi từ client)
     const deviceId = request.headers.get('x-device-id')
 
-    // Lấy secret từ database
     const totpRecord = await prisma.tOTPSecret.findUnique({
       where: { token },
     })
 
     if (!totpRecord) {
-      return NextResponse.json({ error: 'Token không tồn tại' }, { status: 404 })
+      return NextResponse.json({ error: 'Token not found' }, { status: 404 })
     }
 
-    // Kiểm tra quyền truy cập
     const isOwner = deviceId === totpRecord.deviceId
+
+    if (deviceId) {
+      // Track device access
+      const ipAddress = 
+        request.headers.get('x-forwarded-for')?.split(',')[0] ||
+        request.headers.get('x-real-ip') ||
+        'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+
+      // Check if device is blocked
+      const existingAccess = await prisma.deviceAccess.findUnique({
+        where: {
+          token_deviceId: {
+            token,
+            deviceId,
+          },
+        },
+      });
+
+      if (existingAccess?.isBlocked) {
+        return NextResponse.json(
+          { error: 'This device has been blocked from accessing this link' },
+          { status: 403 }
+        );
+      }
+
+      // Create or update device access record
+      await prisma.deviceAccess.upsert({
+        where: {
+          token_deviceId: {
+            token,
+            deviceId,
+          },
+        },
+        update: {
+          lastAccess: new Date(),
+          ipAddress,
+          userAgent,
+        },
+        create: {
+          token,
+          deviceId,
+          ipAddress,
+          userAgent,
+        },
+      });
+    }
+
+    // Check access permission
     if (!totpRecord.isPublic && !isOwner) {
       return NextResponse.json(
-        { error: 'Không có quyền truy cập. Tài khoản này chỉ dành cho thiết bị chủ.' },
+        { error: 'Access denied. This account is private.' },
         { status: 403 }
       )
     }
 
-    // Tạo TOTP instance
+    // Create TOTP instance
     const totp = new TOTP({
       issuer: totpRecord.issuer || undefined,
       label: totpRecord.name,
@@ -43,7 +89,7 @@ export async function GET(
     // Generate OTP code
     const code = totp.generate()
 
-    // Tính thời gian còn lại đến khi OTP expire
+    // Calculate time remaining until OTP expires
     const now = Date.now()
     const epoch = Math.floor(now / 1000)
     const timeRemaining = 30 - (epoch % 30)
@@ -53,7 +99,7 @@ export async function GET(
       timeRemaining,
       name: totpRecord.name,
       issuer: totpRecord.issuer,
-      isOwner, // Để client biết có quyền chỉnh sửa không
+      isOwner,
       isPublic: totpRecord.isPublic,
     })
   } catch (error) {
