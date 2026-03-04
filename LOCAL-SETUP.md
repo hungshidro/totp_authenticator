@@ -1,50 +1,50 @@
 # Quick Setup for Local Development
 
-## Prisma 7 cần PostgreSQL để chạy
+## Prisma 7 requires PostgreSQL
 
-Vì upgrade lên Prisma 7, không thể dùng SQLite nữa. Bạn cần setup PostgreSQL database.
+Due to upgrade to Prisma 7, SQLite is no longer supported. You need to setup a PostgreSQL database.
 
-### ⚡ Cách nhanh nhất (2 phút):
+### Fastest Way (2 minutes):
 
-#### 1. Tạo database miễn phí trên Neon
+#### 1. Create database on Neon
 
 ```bash
-# Mở trình duyệt:
+# Open browser:
 https://neon.tech
 
-# Các bước:
-1. Sign up với GitHub (1 click)
+# Steps:
+1. Sign up with GitHub (1 click)
 2. Create new project
 3. Copy connection string
 ```
 
-#### 2. Cập nhật .env
+#### 2. Update .env
 
-Paste connection string vào file `.env`:
+Paste connection string into `.env` file:
 
 ```env
 DATABASE_URL="postgresql://username:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
 ```
 
-#### 3. Chạy migration
+#### 3. Run migration
 
 ```bash
 npx prisma migrate deploy
 ```
 
-#### 4. Khởi động lại dev server
+#### 4. Restart dev server
 
 ```bash
 npm run dev
 ```
 
-Done! Mọi thứ sẽ hoạt động.
+Done! Everything should work.
 
 ---
 
-## Các option khác:
+## Other Options:
 
-### Option 2: PostgreSQL local (Phức tạp hơn)
+### Option 2: Local PostgreSQL (More complex)
 
 **macOS:**
 ```bash
@@ -63,12 +63,12 @@ npx prisma migrate deploy
 ```
 
 **Windows:**
-- Download PostgreSQL từ postgresql.org
-- Install và setup
-- Tạo database `totp_dev`
+- Download PostgreSQL from postgresql.org
+- Install and setup
+- Create database `totp_dev`
 - Update .env
 
-### Option 3: Docker (Cho developers)
+### Option 3: Docker (For developers)
 
 ```bash
 # docker-compose.yml
@@ -95,9 +95,9 @@ npx prisma migrate deploy
 
 ---
 
-## ⚠️ Nếu muốn quay lại Prisma 5 với SQLite
+## If you want to revert to Prisma 5 with SQLite
 
-Nếu bạn thấy PostgreSQL phức tạp cho local dev:
+If you find PostgreSQL too complex for local dev:
 
 ```bash
 # Downgrade Prisma
@@ -105,49 +105,33 @@ npm uninstall @prisma/adapter-pg @prisma/client prisma pg
 npm install prisma@5.22.0 --save-dev
 npm install @prisma/client@5.22.0
 
-# Xóa config Prisma 7
+# Remove Prisma 7 config
 rm prisma/prisma.config.ts
 
 # Update schema.prisma
-# Thêm lại: url = env("DATABASE_URL")
+# Add back: url = env("DATABASE_URL")
 
 # Update .env
 DATABASE_URL="file:./dev.db"
 
-# Update lib/prisma.ts (xóa adapter code)
+# Update lib/prisma.ts (remove adapter code)
 
 # Migrate
 npx prisma migrate dev
 ```
 
----
-
-## Khuyến nghị
-
-**Dùng Neon** - Lý do:
-- ✅ Free forever
-- ✅ Setup 2 phút
-- ✅ Giống production
-- ✅ Không cần install gì
-- ✅ Backup tự động
-- ✅ Có thể dùng ở bất kỳ đâu (không bind với localhost)
-
----
-
 ## Troubleshooting
 
-### Lỗi: "Can't reach database server"
-→ DATABASE_URL trong .env chưa đúng hoặc chưa setup database
+### Error: "Can't reach database server"
+→ DATABASE_URL in .env is incorrect or database not setup
 
-### Lỗi: "Table does not exist"  
-→ Chưa chạy migration:
+### Error: "Table does not exist"  
+→ Migration not run yet:
 ```bash
 npx prisma migrate deploy
 ```
 
-### Lỗi: "Connection refused"
-→ PostgreSQL chưa start (nếu dùng local)
+### Error: "Connection refused"
+→ PostgreSQL not started (if using local)
 
 ---
-
-**Cần giúp?** Hãy chọn Neon - đơn giản nhất! 🚀

@@ -27,10 +27,8 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Đếm số lượng tokens đã lưu
     setSavedCount(storage.getAll().length);
 
-    // Cleanup scanner khi unmount
     return () => {
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {});
@@ -50,13 +48,11 @@ export default function Home() {
     setScanSuccess(false);
     setError("");
 
-    // Đợi DOM render
     setTimeout(async () => {
       try {
         const html5QrCode = new Html5Qrcode("qr-reader");
         
         const qrCodeSuccessCallback = (decodedText: string) => {
-          console.log("QR scanned:", decodedText);
           if (decodedText.startsWith("otpauth://totp/")) {
             setUri(decodedText);
             setScanSuccess(true);
@@ -68,14 +64,11 @@ export default function Home() {
 
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-        // Prefer back camera for mobile
         await html5QrCode.start(
           { facingMode: "environment" },
           config,
           qrCodeSuccessCallback,
-          (errorMessage) => {
-            // Lỗi quét liên tục, có thể bỏ qua
-          }
+          () => {}
         );
 
         scannerRef.current = html5QrCode;
@@ -110,18 +103,15 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         throw new Error("Vui lòng chọn file ảnh (PNG, JPG, etc.)");
       }
 
-      // Create preview
       const reader = new FileReader();
       reader.onload = async (event) => {
         const imageData = event.target?.result as string;
         setQrPreview(imageData);
 
-        // Decode QR code
         try {
           const img = new Image();
           img.onload = () => {
@@ -155,7 +145,6 @@ export default function Home() {
               return;
             }
 
-            // Validate OTP URI format
             if (!code.data.startsWith("otpauth://totp/")) {
               setError(
                 "Mã QR không đúng định dạng TOTP. Cần format: otpauth://totp/...",
@@ -164,7 +153,6 @@ export default function Home() {
               return;
             }
 
-            // Success - set URI
             setUri(code.data);
             setLoading(false);
           };
@@ -219,14 +207,11 @@ export default function Home() {
     if (files && files.length > 0) {
       const file = files[0];
 
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         setError("Vui lòng chọn file ảnh (PNG, JPG, etc.)");
         return;
       }
 
-      // Create a synthetic event to reuse handleFileChange logic
-      // Directly process the file without creating synthetic event
       handleFileFromInput(file);
     }
   };
@@ -257,7 +242,6 @@ export default function Home() {
         throw new Error(data.error || "Có lỗi xảy ra");
       }
 
-      // Redirect đến trang OTP
       router.push(data.url);
     } catch (err: any) {
       setError(err.message);

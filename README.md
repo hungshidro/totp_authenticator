@@ -1,12 +1,8 @@
 # TOTP Authenticator
 
-Web-based TOTP Authenticator tương tự Microsoft Authenticator, xây dựng với Next.js 14, Prisma 7, và PostgreSQL.
+Web-based TOTP Authenticator similar to Microsoft Authenticator, built with Next.js 14, Prisma 7, and PostgreSQL.
 
-## ⚠️ Quan trọng: Prisma 7 yêu cầu PostgreSQL
-
-Project này sử dụng **Prisma 7** - cần PostgreSQL database (không support SQLite).
-
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone & Install
 
@@ -16,22 +12,22 @@ cd authen_totp
 npm install
 ```
 
-### 2. Setup Database (2 phút)
+### 2. Setup Database
 
-**Option A: Neon (Miễn phí - Khuyên dùng):**
+**Option A: Neon:**
 
 ```bash
-# 1. Truy cập https://neon.tech
-# 2. Sign up với GitHub
+# 1. Visit https://neon.tech
+# 2. Sign up with GitHub
 # 3. Create project → Copy connection string
-# 4. Tạo file .env:
+# 4. Create .env file:
 
 DATABASE_URL="postgresql://user:password@ep-xxx.neon.tech/neondb?sslmode=require"
 ```
 
-**Option B: PostgreSQL local:**
+**Option B: Local PostgreSQL:**
 
-Xem hướng dẫn chi tiết tại [LOCAL-SETUP.md](./LOCAL-SETUP.md)
+See detailed guide at [LOCAL-SETUP.md](./LOCAL-SETUP.md)
 
 ### 3. Check Connection
 
@@ -51,43 +47,46 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-Mở http://localhost:3000
+Open http://localhost:3000
 
-## 🚀 Deploy lên Server Public (Miễn phí)
+## Deploy to Public Server
 
-**Xem hướng dẫn chi tiết tại: [DEPLOYMENT.md](./DEPLOYMENT.md)**
+**See detailed guide at: [DEPLOYMENT.md](./DEPLOYMENT.md)**
 
 ### Quick Deploy:
-1. Tạo database PostgreSQL miễn phí tại [Neon.tech](https://neon.tech)
-2. Push code lên GitHub
-3. Deploy tại [Vercel.com](https://vercel.com)
-4. Thêm `DATABASE_URL` vào Environment Variables
+1. Create free PostgreSQL database at [Neon.tech](https://neon.tech)
+2. Push code to GitHub
+3. Deploy at [Vercel.com](https://vercel.com)
+4. Add `DATABASE_URL` to Environment Variables
 5. Redeploy
 
-## Tính năng
+## Features
 
-- ✅ Nhập OTP URI từ QR code hoặc text
-- ✅ Nhập thủ công secret key
-- ✅ Tạo link unique cho mỗi tài khoản
-- ✅ Hiển thị OTP code tự động refresh mỗi 30 giây
-- ✅ Countdown timer cho OTP
-- ✅ Copy OTP với 1 click
-- ✅ Lưu trữ an toàn trong database
+- Import OTP URI from QR code or text
+- Manual secret key input
+- Generate unique link for each account
+- Display OTP code with auto-refresh every 30 seconds
+- Countdown timer for OTP
+- Copy OTP with 1 click
+- Secure storage in database
+- Device-based access control
+- Public/private link sharing
+- QR code scanning with camera
 
-## Cài đặt
+## Installation
 
 ```bash
-# Cài đặt dependencies
+# Install dependencies
 npm install
 
-# Tạo database và chạy migrations
+# Create database and run migrations
 npx prisma migrate dev --name init
 
 # Generate Prisma Client
 npx prisma generate
 ```
 
-## Chạy ứng dụng
+## Running the Application
 
 ```bash
 # Development mode
@@ -98,17 +97,19 @@ npm run build
 npm start
 ```
 
-Mở trình duyệt tại `http://localhost:3000`
+Open browser at `http://localhost:3000`
 
-## Cấu trúc Database
+## Database Structure
 
 ```prisma
 model TOTPSecret {
   id        String   @id @default(cuid())
-  token     String   @unique  // Token unique để access OTP
-  name      String            // Tên tài khoản
+  token     String   @unique  // Unique token to access OTP
+  name      String            // Account name
   issuer    String?           // Issuer (Google, Microsoft, etc.)
   secret    String            // Secret key (base32)
+  deviceId  String            // Device fingerprint
+  isPublic  Boolean  @default(false) // Public access flag
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -117,12 +118,13 @@ model TOTPSecret {
 ## API Endpoints
 
 ### POST /api/totp
-Tạo TOTP secret mới
+Create new TOTP secret
 
 **Request body (URI mode):**
 ```json
 {
-  "uri": "otpauth://totp/Example:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example"
+  "uri": "otpauth://totp/Example:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example",
+  "deviceId": "device-fingerprint-id"
 }
 ```
 
@@ -131,7 +133,8 @@ Tạo TOTP secret mới
 {
   "name": "user@example.com",
   "issuer": "Google",
-  "secret": "JBSWY3DPEHPK3PXP"
+  "secret": "JBSWY3DPEHPK3PXP",
+  "deviceId": "device-fingerprint-id"
 }
 ```
 
@@ -145,7 +148,12 @@ Tạo TOTP secret mới
 ```
 
 ### GET /api/totp/[token]
-Lấy OTP code hiện tại
+Get current OTP code
+
+**Headers:**
+```
+x-device-id: device-fingerprint-id
+```
 
 **Response:**
 ```json
@@ -153,58 +161,83 @@ Lấy OTP code hiện tại
   "code": "123456",
   "timeRemaining": 25,
   "name": "user@example.com",
-  "issuer": "Google"
+  "issuer": "Google",
+  "isOwner": true,
+  "isPublic": false
 }
 ```
 
-## Sử dụng
+### PATCH /api/totp/[token]
+Update OTP settings (owner only)
 
-1. **Thêm tài khoản mới:**
-   - Chọn "QR Code / URI" và paste chuỗi otpauth://
-   - Hoặc chọn "Nhập thủ công" và nhập Name + Secret Key
+**Request body:**
+```json
+{
+  "isPublic": true
+}
+```
 
-2. **Xem OTP:**
-   - Sau khi tạo, hệ thống sẽ tạo link unique: `/otp/{token}`
-   - Mã OTP sẽ tự động refresh mỗi 30 giây
-   - Click "Sao chép mã" để copy OTP
+## Usage
 
-3. **Lưu link:**
-   - Mỗi tài khoản có 1 link riêng
-   - Bookmark link để truy cập nhanh
+1. **Add New Account:**
+   - Choose "Upload QR" and scan/upload QR code image
+   - Or choose "QR Text" and paste otpauth:// string
+   - Or choose "Manual" and enter Name + Secret Key
+
+2. **View OTP:**
+   - After creation, system generates unique link: `/otp/{token}`
+   - OTP code auto-refreshes every 30 seconds
+   - Click "Copy code" to copy OTP
+
+3. **Save Link:**
+   - Each account has unique link
+   - Bookmark link for quick access
+
+4. **Device Access Control:**
+   - By default, only the device that created the token can access it
+   - Owner can toggle public access to share with other devices
 
 ## Tech Stack
 
 - **Framework:** Next.js 14 (App Router)
-- **Database:** SQLite + Prisma ORM
+- **Database:** PostgreSQL + Prisma ORM
 - **TOTP:** otpauth library
+- **QR Scanning:** html5-qrcode library
+- **Device ID:** FingerprintJS
 - **UI:** Tailwind CSS
 - **TypeScript:** Type-safe development
 
-## Scripts hữu ích
+## Useful Scripts
 
 ```bash
-# Xem database với Prisma Studio
+# View database with Prisma Studio
 npm run prisma:studio
 
 # Reset database
 npx prisma migrate reset
 
-# Tạo migration mới
+# Create new migration
 npx prisma migrate dev --name <migration-name>
+
+# Check database connection
+npm run check-db
+
+# Run custom migration
+npm run migrate
 ```
 
-## Bảo mật
+## Security
 
-⚠️ **Lưu ý quan trọng:**
-- Project này dùng SQLite nên chỉ phù hợp cho development/personal use
-- Với production, nên:
-  - Chuyển sang PostgreSQL hoặc MySQL
-  - Thêm authentication (NextAuth.js)
-  - Encrypt secrets trong database
-  - Sử dụng HTTPS
-  - Rate limiting cho API
+**Important Notes:**
+- Project uses device fingerprinting for access control
+- For production use:
+  - Use PostgreSQL or MySQL
+  - Add authentication (NextAuth.js)
+  - Encrypt secrets in database
+  - Use HTTPS
+  - Rate limiting for API
+  - Regular security audits
 
 ## License
 
 MIT
-# totp_authenticator

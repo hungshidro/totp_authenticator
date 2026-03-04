@@ -1,39 +1,36 @@
-# Hướng dẫn Deploy lên Vercel (Miễn phí)
+# Deployment Guide for Vercel
 
-## Bước 1: Tạo Database PostgreSQL miễn phí
+## Step 1: Create PostgreSQL Database
 
-### Lựa chọn 1: Neon (Khuyên dùng)
-1. Truy cập https://neon.tech
-2. Sign up miễn phí (dùng GitHub)
+### Option 1: Neon (Recommended)
+1. Visit https://neon.tech
+2. Sign up (use GitHub)
 3. Create new project
 4. Copy **Connection String** (format: `postgresql://user:password@host/database?sslmode=require`)
 
-### Lựa chọn 2: Supabase
-1. Truy cập https://supabase.com
-2. Sign up miễn phí
+### Option 2: Supabase
+1. Visit https://supabase.com
+2. Sign up
 3. Create new project
-4. Vào Settings → Database → Copy **Connection String** (URI)
+4. Go to Settings → Database → Copy **Connection String** (URI)
 
-### Lựa chọn 3: Railway
-1. Truy cập https://railway.app
-2. Sign up miễn phí
+### Option 3: Railway
+1. Visit https://railway.app
+2. Sign up
 3. New Project → Provision PostgreSQL
 4. Copy **DATABASE_URL**
 
-## Bước 2: Cập nhật Prisma Schema
+## Step 2: Update Prisma Schema
 
-⚠️ **Lưu ý:** Prisma 7 không cần `url` trong schema.prisma nữa!
-
-File `prisma/schema.prisma` đã được cấu hình đúng:
+File `prisma/schema.prisma` is already configured:
 
 ```prisma
 datasource db {
   provider = "postgresql"
-  // Không có url property - được config trong prisma.config.ts
 }
 ```
 
-File `prisma/prisma.config.ts` chứa connection URL:
+File `prisma/prisma.config.ts` contains connection URL:
 
 ```typescript
 import { defineConfig } from '@prisma/client/config'
@@ -47,32 +44,30 @@ export default defineConfig({
 })
 ```
 
-## Bước 3: Tạo file .env.production (Local testing)
+## Step 3: Create .env.production file (Local testing)
 
 ```env
 DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
 ```
 
-⚠️ **Không commit file này lên Git!**
-
-## Bước 4: Test migration với PostgreSQL (Local)
+## Step 4: Test migration with PostgreSQL (Local)
 
 ```bash
-# Set DATABASE_URL tạm thời
+# Set DATABASE_URL temporarily
 export DATABASE_URL="postgresql://your-connection-string"
 
-# Chạy migration
+# Run migration
 npx prisma migrate deploy
 
-# Test local
+# Test locally
 npm run dev
 ```
 
-## Bước 5: Deploy lên Vercel
+## Step 5: Deploy to Vercel
 
-### Cách 1: Deploy qua GitHub (Khuyên dùng)
+### Method 1: Deploy via GitHub
 
-1. **Push code lên GitHub:**
+1. **Push code to GitHub:**
    ```bash
    git init
    git add .
@@ -82,27 +77,27 @@ npm run dev
    git push -u origin main
    ```
 
-2. **Deploy trên Vercel:**
-   - Truy cập https://vercel.com
-   - Sign up bằng GitHub
+2. **Deploy on Vercel:**
+   - Visit https://vercel.com
+   - Sign up with GitHub
    - Click "Add New" → "Project"
-   - Import repository của bạn
+   - Import your repository
    - Click "Deploy"
 
-3. **Thêm Environment Variables:**
-   - Vào Project Settings → Environment Variables
-   - Thêm:
+3. **Add Environment Variables:**
+   - Go to Project Settings → Environment Variables
+   - Add:
      - Key: `DATABASE_URL`
      - Value: `postgresql://your-connection-string`
    - Click "Save"
 
 4. **Redeploy:**
-   - Vào Deployments → Click "..." → "Redeploy"
+   - Go to Deployments → Click "..." → "Redeploy"
 
-### Cách 2: Deploy qua Vercel CLI
+### Method 2: Deploy via Vercel CLI
 
 ```bash
-# Cài Vercel CLI
+# Install Vercel CLI
 npm install -g vercel
 
 # Login
@@ -111,18 +106,18 @@ vercel login
 # Deploy
 vercel
 
-# Thêm environment variable
+# Add environment variable
 vercel env add DATABASE_URL
 
-# Paste connection string và chọn Production
+# Paste connection string and choose Production
 
 # Redeploy
 vercel --prod
 ```
 
-## Bước 6: Chạy Database Migration trên Production
+## Step 6: Run Database Migration on Production
 
-Vercel sẽ **tự động chạy migration** khi build thông qua `vercel.json`:
+Vercel will **automatically run migration** during build via `vercel.json`:
 
 ```json
 {
@@ -130,74 +125,62 @@ Vercel sẽ **tự động chạy migration** khi build thông qua `vercel.json`
 }
 ```
 
-Nếu cần chạy manual:
+If you need to run manually:
 
 ```bash
 # Local
 npm run migrate
 
-# Hoặc với DATABASE_URL trực tiếp
+# Or with DATABASE_URL directly
 DATABASE_URL="your-connection-string" npm run migrate
 ```
 
-## Bước 7: Kiểm tra
+## Step 7: Verification
 
-1. Mở URL Vercel cung cấp (vd: `https://your-app.vercel.app`)
-2. Thử tạo một TOTP mới
-3. Kiểm tra OTP có hoạt động không
+1. Open the URL provided by Vercel (e.g., `https://your-app.vercel.app`)
+2. Try creating a new TOTP
+3. Check if OTP works
 
-## Hoàn thành!
+## Done!
 
-App của bạn đã live tại: `https://your-app.vercel.app`
+Your app is now live at: `https://your-app.vercel.app`
 
-## Lưu ý
-
-- **Miễn phí hoàn toàn:** Vercel Free tier + Neon Free tier
-- **Giới hạn Free:**
-  - Vercel: 100 GB bandwidth/tháng, 100 deployments/ngày
-  - Neon: 1 project, 10 GB storage
-  - Supabase: 2 projects, 500 MB database
-- **Custom Domain:** Có thể thêm domain riêng miễn phí trên Vercel
-- **Auto Deploy:** Mỗi khi push code lên GitHub, Vercel tự động deploy
-
-## 🔧 Troubleshooting
-
-### Lỗi: "Cannot find module @prisma/client"
+### Error: "Cannot find module @prisma/client"
 ```bash
-# Thêm vào package.json (đã có sẵn)
+# Add to package.json (already included)
 "scripts": {
   "postinstall": "prisma generate"
 }
 ```
 
-### Lỗi: "The datasource property `url` is no longer supported"
-**Giải pháp:** Project này đã giải quyết issue này bằng cách:
-- Giữ `url` trong schema.prisma (CLI tools cần)
-- Dùng adapter pattern trong runtime (lib/prisma.ts)
-- Dùng custom migration script thay vì prisma migrate
+### Error: "The datasource property `url` is no longer supported"
+**Solution:** This project has resolved this issue by:
+- Keeping `url` in schema.prisma (CLI tools need it)
+- Using adapter pattern at runtime (lib/prisma.ts)
+- Using custom migration script instead of prisma migrate
 
-### Lỗi database connection
-- Kiểm tra `DATABASE_URL` trong Vercel environment variables
-- Đảm bảo có `?sslmode=require` ở cuối connection string
-- Kiểm tra IP whitelist trên database provider (Neon/Supabase)
+### Database connection error
+- Check `DATABASE_URL` in Vercel environment variables
+- Ensure `?sslmode=require` is at the end of connection string
+- Check IP whitelist on database provider (Neon/Supabase)
 
-### OTP không generate
-- Check logs trên Vercel Dashboard
-- Vào Functions → Chọn API route → Xem logs
+### OTP not generating
+- Check logs on Vercel Dashboard
+- Go to Functions → Select API route → View logs
 
-## Nâng cao
+## Advanced
 
-Sau khi deploy thành công, bạn có thể:
+After successful deployment, you can:
 
-1. **Thêm Custom Domain:**
+1. **Add Custom Domain:**
    - Vercel Dashboard → Settings → Domains
-   - Thêm domain của bạn
+   - Add your domain
 
-2. **Thêm Analytics:**
-   - Vercel tích hợp Analytics miễn phí
+2. **Add Analytics:**
+   - Vercel has integrated Analytics
 
 3. **Setup CI/CD:**
-   - Đã tự động với GitHub integration
+   - Already automated with GitHub integration
 
 4. **Monitor Performance:**
    - Vercel Dashboard → Analytics → Web Vitals

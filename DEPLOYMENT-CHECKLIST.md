@@ -3,9 +3,9 @@
 ## Pre-Deployment
 
 ### 1. Database Setup
-- [ ] Tạo PostgreSQL database trên [Neon.tech](https://neon.tech) hoặc [Supabase](https://supabase.com)
+- [ ] Create PostgreSQL database on [Neon.tech](https://neon.tech) or [Supabase](https://supabase.com)
 - [ ] Copy connection string
-- [ ] Test connection local:
+- [ ] Test connection locally:
   ```bash
   export DATABASE_URL="postgresql://..."
   npx prisma db pull
@@ -31,7 +31,7 @@ Required packages:
 - `vercel.json` - Build command includes prisma generate
 - `.env.example` - Template for DATABASE_URL
 
-## 🚀 Deployment Steps (Vercel)
+## Deployment Steps (Vercel)
 
 ### Option A: Via GitHub (Recommended)
 
@@ -76,7 +76,7 @@ vercel env add DATABASE_URL
 vercel --prod
 ```
 
-## 🔍 Post-Deployment Checks
+## Post-Deployment Checks
 
 ### 1. Verify Build Logs
 Check that these steps succeeded:
@@ -123,7 +123,7 @@ npm install @prisma/adapter-pg pg
 **Fix:** Check DATABASE_URL:
 - Has `?sslmode=require` at the end
 - Correct username/password
-- Database is not paused (free tier limitation)
+- Database is not paused (tier limitation)
 - IP whitelist allows all (0.0.0.0/0)
 
 ### Error: "Table TOTPSecret does not exist"
@@ -150,28 +150,10 @@ This is a known Prisma 7 limitation we've worked around.
 4. Look for error messages
 5. Most common: DATABASE_URL not set or invalid
 
-## Monitoring
-
-### Performance
-- Vercel Analytics (free)
-- Monitor cold starts
-- Check database query performance
-
-### Database
-- Neon: Dashboard shows storage usage
-- Free tier: 1 project, 10 GB storage
-- Set up alerts for approaching limits
-
-### Costs
-- Vercel: 100 GB bandwidth/month (free)
-- Neon: Free tier never expires
-- Zero cost for personal projects
-
-## 🔄 Updates & Maintenance
-
 ### Code Updates
 ```bash
-git pUpdate migration script if needed (scripts/migrate.js)
+# 1. Make changes locally
+# 2. Update migration script if needed (scripts/migrate.js)
 # 3. Test locally
 npm run migrate
 
@@ -180,7 +162,14 @@ git add prisma/ scripts/
 git commit -m "feat: update schema"
 git push
 
-# 5 prisma migrate dev --name describe_change
+# 5. Vercel deploys and runs migrations automatically
+```
+
+### Schema Changes
+```bash
+# 1. Update schema.prisma
+# 2. Create migration
+npx prisma migrate dev --name describe_change
 
 # 3. Push to git
 git add prisma/migrations
@@ -211,12 +200,11 @@ Your deployment is successful when:
 
 Share your app:
 - Production URL: `https://your-app.vercel.app`
-- Custom domain: Add in Vercel settings (free)
+- Custom domain: Add in Vercel settings
 
 ---
 
 **Need help?** Check:
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - Full guide
-- [QUICK-DEPLOY.md](./QUICK-DEPLOY.md) - Quick start
 - [Vercel Docs](https://vercel.com/docs)
 - [Prisma 7 Docs](https://www.prisma.io/docs)
