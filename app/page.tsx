@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import jsQR from "jsqr";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { storage } from "@/lib/storage";
 import { deviceManager } from "@/lib/device";
 
@@ -22,7 +22,7 @@ export default function Home() {
   const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function Home() {
     // Cleanup scanner khi unmount
     return () => {
       if (scannerRef.current) {
-        scannerRef.current.clear().catch(() => {});
+        scannerRef.current.stop().catch(() => {});
       }
     };
   }, []);
@@ -44,25 +44,16 @@ export default function Home() {
     }
   };
 
-  const startScanning = () => {
+  const startScanning = async () => {
     setIsScanning(true);
     setError("");
 
     // Đợi DOM render
-    setTimeout(() => {
-      const scanner = new Html5QrcodeScanner(
-        "qr-reader",
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        },
-        /* verbose= */ false,
-      );
-
-      scanner.render(
-        (decodedText) => {
-          // Quét thành công
+    setTimeout(async () => {
+      try {
+        const html5QrCode = new Html5Qrcode("qr-reader");
+        
+        const qrCodeSuccessCallback = (decodedText: string) => {
           console.log("QR scanned:", decodedText);
           if (decodedText.startsWith("otpauth://totp/")) {
             setUri(decodedText);
@@ -70,26 +61,39 @@ export default function Home() {
           } else {
             setError("Mã QR không đúng định dạng TOTP.");
           }
-        },
-        (errorMessage) => {
-          // Lỗi quét (có thể bỏ qua vì quét liên tục)
-          console.log("Scan error:", errorMessage);
-        },
-      );
+        };
 
-      scannerRef.current = scanner;
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        // Prefer back camera for mobile
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          qrCodeSuccessCallback,
+          (errorMessage) => {
+            // Lỗi quét liên tục, có thể bỏ qua
+          }
+        );
+
+        scannerRef.current = html5QrCode;
+      } catch (err: any) {
+        console.error("Camera start error:", err);
+        setError("Không thể mở camera. Vui lòng kiểm tra quyền truy cập camera.");
+        setIsScanning(false);
+      }
     }, 100);
   };
 
   const stopScanning = () => {
     if (scannerRef.current) {
       scannerRef.current
-        .clear()
+        .stop()
         .then(() => {
           scannerRef.current = null;
           setIsScanning(false);
         })
-        .catch(() => {
+        .catch((err) => {
+          console.error("Stop error:", err);
           scannerRef.current = null;
           setIsScanning(false);
         });
